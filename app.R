@@ -266,7 +266,7 @@ server <- function(input, output) {
     })
     
     output$hospitalLate <- renderValueBox({
-        cr.T <- cor.test(int_dat_h$newCasesByPublishDate,int_dat_h$newAdmissions,mtethod = "kendall",exact = F,)
+        cr.T <- cor.test(int_dat_h$newCasesByPublishDate,int_dat_h$newAdmissions,method = "kendall",exact = F,)
         string <- paste0(round(cr.T$estimate,2)," (p=",round(cr.T$p.value,3),")")
         valueBox(subtitle = "cases to admissions",value = string)
     })
@@ -277,7 +277,7 @@ server <- function(input, output) {
     
     
     output$deathsLate <- renderValueBox({
-        cr.T <- cor.test(int_dat_d$newCasesByPublishDate,int_dat_d$newDeaths28DaysByPublishDate,mtethod = "kendall",exact = F)
+        cr.T <- cor.test(int_dat_d$newCasesByPublishDate,int_dat_d$newDeaths28DaysByPublishDate,method = "kendall",exact = F)
         string <- paste0(round(cr.T$estimate,2)," (p=",round(cr.T$p.value,3),")")
         valueBox(subtitle = "cases to deaths",value = string,color = "blue")
     })
