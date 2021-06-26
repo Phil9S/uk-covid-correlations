@@ -18,12 +18,12 @@ library(ggpubr)
 # vars
 nation_per_million_ratio <- 0.0150037509 # UK
 nation_population_adult <- 52654348 # UK
-source_data <- "https://api.coronavirus.data.gov.uk/v2/data?areaType=overview&metric=cumPeopleVaccinatedFirstDoseByPublishDate&metric=newAdmissions&metric=newCasesByPublishDate&metric=newDeaths28DaysByPublishDate&metric=newTestsByPublishDate&format=csv"
+source_data <- "https://api.coronavirus.data.gov.uk/v2/data?areaType=overview&metric=cumPeopleVaccinatedFirstDoseByPublishDate&metric=newAdmissions&metric=newCasesByPublishDate&metric=newDeaths28DaysByPublishDate&metric=https://api.coronavirus.data.gov.uk/v2/data?areaType=overview&metric=cumPeopleVaccinatedSecondDoseByPublishDate&format=csv&format=csv"
 # funcs
 cor_window <- function(dat,window,step,group){
     win.data <- data.frame(date=c(),corr.kendall=c(),p.value=c())
     start <- 1
-    while(nrow(dat) - start > 10){
+    while(nrow(dat) - start > 8){
         if(window > nrow(dat)){
           sub <- dat[c(start:nrow(dat)),]
           incomp <- TRUE
@@ -74,16 +74,33 @@ cor_window <- function(dat,window,step,group){
     #win.data <- win.data[!is.na(win.data$p.value),]
     return(win.data)
 }
+
+pct_plot_data <- function(dat){
+  at_first <- floor(max((dat$cumPeopleVaccinatedFirstDoseByPublishDate/nation_population_adult)*100,na.rm = T))
+  remain <- 100 - at_first
+  first_mat <- matrix(c(rep(1,times=at_first),rep(0,times=remain)),nrow = 10,ncol = 10)
+  at_second <- floor(max((dat$cumPeopleVaccinatedSecondDoseByPublishDate/nation_population_adult)*100,na.rm = T))
+  remain2 <- 100 - at_second
+  second_mat <- matrix(c(rep(1,times=at_second),rep(0,times=remain2)),nrow = 10,ncol = 10)
+  plot_mat <- first_mat + second_mat
+  rownames(plot_mat) <- 1:10
+  colnames(plot_mat) <- 1:10
+  plot_mat_df <- as.data.frame.table(plot_mat)
+  ggplot(plot_mat_df) +
+    geom_tile(aes(x = Var1,y = Var2,fill=as.factor(Freq)),color="white") +
+    scale_fill_manual(values = c("grey90","dodgerblue","dodgerblue4")) +
+    labs(title = "Vaccine coverage") +
+    theme_bw() +
+    theme(legend.position = "none",axis.title = element_blank(),axis.text = element_blank(),axis.ticks = element_blank())
+}
+
 # data
 dat <- read.csv(source_data,header = T) %>%
     mutate(date = as.Date(date)) %>%
-    arrange(date) %>% slice(62:n()) %>% # First days (march 2020) of reporting is highly inconsistent and contains a lot of missing data for admissions and deaths
-    mutate(newAdmissions = newAdmissions * nation_per_million_ratio) %>%
-    mutate(newCasesByPublishDate = newCasesByPublishDate * nation_per_million_ratio) %>%
-    mutate(newDeaths28DaysByPublishDate = newDeaths28DaysByPublishDate * nation_per_million_ratio) %>%
-    mutate(newTestsByPublishDate = newTestsByPublishDate * nation_per_million_ratio) %>%
-    mutate(cumPeopleVaccinatedFirstDoseByPublishDate = cumPeopleVaccinatedFirstDoseByPublishDate / nation_population_adult)
-
+    arrange(date) %>% slice(62:n()) #%>% # First days (march 2020) of reporting is highly inconsistent and contains a lot of missing data for admissions and deaths
+    # mutate(newAdmissions = newAdmissions * nation_per_million_ratio) %>%
+    # mutate(newCasesByPublishDate = newCasesByPublishDate * nation_per_million_ratio) %>%
+    # mutate(newDeaths28DaysByPublishDate = newDeaths28DaysByPublishDate * nation_per_million_ratio)
 
 int_dat_h <- dat[which(apply(dat[,c("newAdmissions","newCasesByPublishDate")],MARGIN = 1,function(x)  !any(is.na(x)))),] %>%
               arrange(desc(date)) %>%
@@ -96,7 +113,7 @@ int_dat_d <- dat[which(apply(dat[,c("newDeaths28DaysByPublishDate","newCasesByPu
 pivot_dat <- dat %>%
     pivot_longer(cols = 5:9,names_to = "stat",values_to = "count")
 
-stat_selection <- unique(pivot_dat$stat)[c(2,4)]
+stat_selection <- unique(pivot_dat$stat)[c(3,5)]
 names(stat_selection) <- c("hospital admissions","deaths")
 
 # Define UI
@@ -135,7 +152,7 @@ ui <- fluidPage(theme = shinytheme("flatly"),
                             label = "Date range:",
                             min = min(dat$date),
                             max = max(dat$date),
-                            start = as.Date("2021-01-01"),
+                            start = as.Date("2021-04-01"),
                             end = max(dat$date)),
              selectInput(inputId = "type",
                          label = "Statistic:",
@@ -163,6 +180,24 @@ ui <- fluidPage(theme = shinytheme("flatly"),
         )
     )
   ),
+  tabPanel(title = "Vaccination", icon = icon("signal"),
+           fluidRow(
+             column(12,h3(tags$b("Vaccination")),style='margin-top: 62.5px;'),
+           ),
+           hr(),
+           fluidRow(
+             column(3,
+                    plotOutput("vacc_prog",height = "400px")
+             ),
+             column(3,
+                    plotOutput("first_vacc",height = "400px")
+                    ),
+             column(3,
+                    plotOutput("second_vacc",height = "400px")
+             ),
+           )
+           
+  ),
   tabPanel(title = "Data", icon = icon("table"),
     fluidRow(
       column(12,h3(tags$b("Data table")),style='margin-top: 62.5px;'),
@@ -182,7 +217,7 @@ ui <- fluidPage(theme = shinytheme("flatly"),
 # Define server logic required to draw a histogram
 server <- function(input, output) {
     plotData <- reactive({
-        pData <- pivot_dat[pivot_dat$date >= input$date_range & pivot_dat$date <= input$date_range[2],]
+        pData <- pivot_dat[pivot_dat$date >= input$date_range[1] & pivot_dat$date <= input$date_range[2],]
         pData <- pData[pData$stat %in% c("newCasesByPublishDate",input$type),]
         
         if(input$type == "newDeaths28DaysByPublishDate"){
@@ -200,22 +235,18 @@ server <- function(input, output) {
         cor_data <- plotD[[2]]
         
         p1 <- ggplot() +
-            geom_rect(data = cor_data[cor_data$incomp == TRUE,],
-                    aes(xmin = min(cor_data$date[cor_data$incomp == TRUE]),
-                               xmax=max(pivot_dat$date),ymin = -Inf,ymax = Inf),
-                    fill=ifelse(cor_data$incomp[cor_data$incomp == TRUE] == TRUE,"grey95",NA),
-                    alpha=0.3) +
             geom_rect(data = cor_data,
                       aes(xmin = date, xmax=date2,ymin = -Inf,ymax = Inf,fill=fill),alpha=0.3) +
             geom_line(data = pivot_dat,aes(date,count,color=stat)) +
-            #labs(title = "COVID-19: cases against hospital admissions correlation") +
-            ylab(label = "patients per million") +
+            geom_vline(xintercept = min(cor_data$date[cor_data$incomp == TRUE]),linetype=2) +
+            ylab(label = "patients") +
             scale_fill_manual(name="correlation",
                               values = c("negative"="green","non-significant"=NA,"positive"="pink"),
                               guide = guide_legend(override.aes = list(color="grey25"))) +
             scale_color_manual(name="statistics",values = c("newCasesByPublishDate"="blue","newDeaths28DaysByPublishDate"="black","newAdmissions"="orange"),
-                               labels = c("newAdmissions"="admissions","newCasesByPublishDate"="cases","newDeaths28DaysByPublishDate"="deaths")) +
+                               labels = c("newCasesByPublishDate"="cases","newAdmissions"="admissions","newDeaths28DaysByPublishDate"="deaths")) +
             scale_x_date(limits = c(min(pivot_dat$date),max(pivot_dat$date)),expand = c(0,0)) +
+            facet_wrap(. ~ stat,nrow = 2,scales = "free") +
             theme_bw() +
             theme(text=element_text(size=18)) +
             theme(axis.text.x = element_blank(),
@@ -223,15 +254,11 @@ server <- function(input, output) {
                   axis.title.x = element_blank())
         
         p2 <- ggplot(data = cor_data) +
-          geom_rect(data = cor_data[cor_data$incomp == TRUE,],
-                    aes(xmin = min(cor_data$date[cor_data$incomp == TRUE]),
-                        xmax=max(pivot_dat$date),ymin = -Inf,ymax = Inf),
-                    fill=ifelse(cor_data$incomp[cor_data$incomp == TRUE] == TRUE,"grey95",NA),
-                    alpha=0.3) +
             geom_hline(yintercept = 0) +
             geom_line(aes(date,corr.kendall)) +
             geom_rect(data = cor_data,
                       aes(xmin = date, xmax=date2,ymin = -Inf,ymax = Inf,fill=fill),alpha=0.3) +
+            geom_vline(xintercept = min(cor_data$date[cor_data$incomp == TRUE]),linetype=2) +
             ylab(label = "correlation (kendall)") +
             scale_fill_manual(name="correlation",
                               values = c("negative"="green","non-significant"=NA,"positive"="pink"),
@@ -245,15 +272,11 @@ server <- function(input, output) {
                   axis.title.x = element_blank())
         
         p3 <- ggplot(data = cor_data) +
-            geom_rect(data = cor_data[cor_data$incomp == TRUE,],
-                    aes(xmin = min(cor_data$date[cor_data$incomp == TRUE]),
-                        xmax=max(pivot_dat$date),ymin = -Inf,ymax = Inf),
-                    fill=ifelse(cor_data$incomp[cor_data$incomp == TRUE] == TRUE,"grey95",NA),
-                    alpha=0.3) +
             geom_hline(yintercept = 1.30103) +
             geom_line(aes(date,-log10(p.value))) +
             geom_rect(data = cor_data,
                       aes(xmin = date, xmax=date2,ymin = -Inf,ymax = Inf,fill=fill),alpha=0.3) +
+            geom_vline(xintercept = min(cor_data$date[cor_data$incomp == TRUE]),linetype=2) +
             ylab(label = "-log10(p.value)") +
             scale_fill_manual(name="correlation",
                               values = c("negative"="green","non-significant"=NA,"positive"="pink"),
@@ -267,7 +290,7 @@ server <- function(input, output) {
     
     output$hospitalLate <- renderValueBox({
         cr.T <- cor.test(int_dat_h$newCasesByPublishDate,int_dat_h$newAdmissions,method = "kendall",exact = F,)
-        string <- paste0(round(cr.T$estimate,2)," (p=",round(cr.T$p.value,3),")")
+        string <- paste0(round(cr.T$estimate,2)," (p=",round(cr.T$p.value,5),")")
         valueBox(subtitle = "cases to admissions",value = string)
     })
     
@@ -278,7 +301,7 @@ server <- function(input, output) {
     
     output$deathsLate <- renderValueBox({
         cr.T <- cor.test(int_dat_d$newCasesByPublishDate,int_dat_d$newDeaths28DaysByPublishDate,method = "kendall",exact = F)
-        string <- paste0(round(cr.T$estimate,2)," (p=",round(cr.T$p.value,3),")")
+        string <- paste0(round(cr.T$estimate,2)," (p=",round(cr.T$p.value,5),")")
         valueBox(subtitle = "cases to deaths",value = string,color = "blue")
     })
     
@@ -289,6 +312,81 @@ server <- function(input, output) {
     output$table <- renderDataTable({
       dat %>%
         arrange(desc(date))
+    })
+    
+    output$vacc_prog <- renderPlot({
+      vacc_prog <- pct_plot_data(dat = dat)
+      vacc_prog
+    })
+    
+    output$first_vacc <- renderPlot({
+      first_vacc <- pivot_dat[pivot_dat$stat == "cumPeopleVaccinatedFirstDoseByPublishDate" & !is.na(pivot_dat$count),]
+      first_vacc$group <- rep("actual",times=nrow(first_vacc))
+      average_uptake <- mean(tail(first_vacc$count,n = 14) - lag(tail(first_vacc$count,n = 14)),na.rm = T)
+      max_diff <- nation_population_adult - max(first_vacc$count)
+      days_to_max <- round(max_diff / average_uptake)
+      
+      extrapv1 <- data.frame()
+      for(x in 1:days_to_max){
+          d <- max(first_vacc$date) + x
+          c <- max(first_vacc$count) + x * average_uptake
+          extrapv1 <- rbind(extrapv1,data.frame(areaCode = "K02000001",
+                                            areaName = "United Kingdom",
+                                            areaType = "overview",
+                                            date = d,
+                                            stat = "cumPeopleVaccinatedFirstDoseByPublishDate",
+                                            count = c,
+                                            group = "predicted"
+                                            ))
+      }
+      
+      v1 <- ggplot() +
+        geom_line(data = first_vacc,
+                  aes(date,(count/nation_population_adult)*100),color = "black",linetype=1) +
+        geom_line(data = extrapv1,
+                  aes(date,(count/nation_population_adult)*100),color = "red",linetype=2) +
+        geom_vline(xintercept = max(extrapv1$date)) +
+        geom_text(data = extrapv1,aes(x = max(date) - 25,y = 2,label=paste0("100% on ",max(date)))) +
+        xlab(NULL) + 
+        ylab(label = "first dose (cummulative)") +
+        scale_y_continuous(limits = c(0,100),expand = c(0,0)) +
+        theme_bw()
+      v1
+    })
+    
+    output$second_vacc <- renderPlot({
+      second_vacc <- pivot_dat[pivot_dat$stat == "cumPeopleVaccinatedSecondDoseByPublishDate" & !is.na(pivot_dat$count),]
+      second_vacc$group <- rep("actual",times=nrow(second_vacc))
+      average_uptake <- mean(tail(second_vacc$count,n = 14) - lag(tail(second_vacc$count,n = 14)),na.rm = T)
+      max_diff <- nation_population_adult - max(second_vacc$count)
+      days_to_max <- round(max_diff / average_uptake)
+      
+      extrapv2 <- data.frame()
+      for(x in 1:days_to_max){
+        d <- max(second_vacc$date) + x
+        c <- max(second_vacc$count) + x * average_uptake
+        extrapv2 <- rbind(extrapv2,data.frame(areaCode = "K02000001",
+                                          areaName = "United Kingdom",
+                                          areaType = "overview",
+                                          date = d,
+                                          stat = "cumPeopleVaccinatedSecondDoseByPublishDate",
+                                          count = c,
+                                          group = "predicted"
+        ))
+      }
+      
+      v2 <- ggplot() +
+        geom_line(data = second_vacc,
+                  aes(date,(count/nation_population_adult)*100),color = "black",linetype=1) +
+        geom_line(data=extrapv2,
+                  aes(date,(count/nation_population_adult)*100),color = "red",linetype=2) +
+        geom_vline(xintercept = max(extrapv2$date)) +
+        geom_text(data = extrapv2,aes(x = max(date) - 30,y = 2,label=paste0("100% on ",max(date)))) +
+        xlab(NULL) + 
+        ylab(label = "Second dose (cummulative)") +
+        scale_y_continuous(limits = c(0,100),expand = c(0,0)) +
+        theme_bw()
+      v2
     })
     
 }
