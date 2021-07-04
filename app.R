@@ -121,7 +121,7 @@ names(stat_selection) <- c("hospital admissions","deaths")
 ui <- fluidPage(theme = shinytheme("flatly"),
     navbarPage(title = "COIVD-19: UK patient correlations", collapsible = TRUE,position = "fixed-top",    
     # Application title
-    tabPanel(title = "Summary", icon = icon("signal"),
+    tabPanel(title = "Summary", icon = icon("chart-bar"),
     fluidRow(
      column(12,h3(tags$b("COVID-19: UK correlation between cases and clinical events")),style='margin-top: 62.5px; padding-left: 30px'),
     ),
@@ -148,7 +148,7 @@ ui <- fluidPage(theme = shinytheme("flatly"),
     ),
     hr(),
     fluidRow(
-        sidebarPanel(title = "Browser", icon = icon("flask"),width = 12,
+        sidebarPanel(title = "Browser", icon = icon("chart-bar"),width = 12,
              dateRangeInput(inputId = "date_range",
                             label = "Date range:",
                             min = min(dat$date),
@@ -180,24 +180,24 @@ ui <- fluidPage(theme = shinytheme("flatly"),
     ),
     column(7,
     mainPanel(width = 12,
-           plotOutput("corrPlot",height = "800px")
+           plotOutput("corrPlot",height = "1045px")
         )
     )
   ),
-  tabPanel(title = "Vaccination", icon = icon("signal"),
+  tabPanel(title = "Vaccination", icon = icon("grip-horizontal"),
            fluidRow(
              column(12,h3(tags$b("Vaccination")),style='margin-top: 62.5px;'),
            ),
            hr(),
            fluidRow(
-             column(3,
-                    plotOutput("vacc_prog",height = "400px")
+             column(4,
+                    plotOutput("vacc_prog",height = "500px")
              ),
-             column(3,
-                    plotOutput("first_vacc",height = "400px")
+             column(4,
+                    plotOutput("first_vacc",height = "500px")
                     ),
-             column(3,
-                    plotOutput("second_vacc",height = "400px")
+             column(4,
+                    plotOutput("second_vacc",height = "500px")
              ),
            )
            
@@ -305,7 +305,7 @@ server <- function(input, output) {
       ggplot(plotData2()) +
         geom_line(aes(date,count,color=stat)) +
         scale_x_date(limits = c(min(plotData2()$date),max(plotData2()$date)),expand = c(0,0)) +
-        facet_wrap(. ~ stat,nrow = 1,scales = "free") +
+        facet_wrap(. ~ stat,nrow = 1) +
         theme_bw() +
         theme(text=element_text(size=18)) +
         theme(axis.ticks.x = element_blank(),
