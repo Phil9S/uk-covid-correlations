@@ -19,6 +19,8 @@ library(ggpubr)
 nation_per_million_ratio <- 0.0150037509 # UK
 nation_population_adult <- 52654348 # UK
 source_data <- "https://api.coronavirus.data.gov.uk/v2/data?areaType=overview&metric=cumPeopleVaccinatedFirstDoseByPublishDate&metric=newAdmissions&metric=newCasesByPublishDate&metric=newDeaths28DaysByPublishDate&metric=https://api.coronavirus.data.gov.uk/v2/data?areaType=overview&metric=cumPeopleVaccinatedSecondDoseByPublishDate&format=csv&format=csv"
+source_data2 <- "https://api.coronavirus.data.gov.uk/v2/data?areaType=overview&metric=newTestsByPublishDate&format=csv&format=csv"
+
 # funcs
 cor_window <- function(dat,window,step,group){
     win.data <- data.frame(date=c(),corr.kendall=c(),p.value=c())
@@ -95,11 +97,16 @@ pct_plot_data <- function(dat){
 }
 
 # data
+dat2 <- read.csv(source_data2,header = T) %>%
+    select(date,newTestsByPublishDate)
+
 dat <- read.csv(source_data,header = T) %>%
+    left_join(y = dat2,by = "date") %>%
     mutate(date = as.Date(date)) %>%
     arrange(date) %>% slice(62:n()) %>% # First days (march 2020) of reporting is highly inconsistent and contains a lot of missing data for admissions and deaths
     mutate(admissionsperk = newAdmissions / (newCasesByPublishDate/1000)) %>%
-    mutate(deathsperk = newDeaths28DaysByPublishDate / (newCasesByPublishDate/1000))
+    mutate(deathsperk = newDeaths28DaysByPublishDate / (newCasesByPublishDate / 1000)) %>%
+    mutate(posivitity_rate = newCasesByPublishDate / newTestsByPublishDate * 100)
     # mutate(newCasesByPublishDate = newCasesByPublishDate * nation_per_million_ratio) %>%
     # mutate(newDeaths28DaysByPublishDate = newDeaths28DaysByPublishDate * nation_per_million_ratio)
 
@@ -112,7 +119,7 @@ int_dat_d <- dat[which(apply(dat[,c("newDeaths28DaysByPublishDate","newCasesByPu
               slice(1:30)
 
 pivot_dat <- dat %>%
-    pivot_longer(cols = 5:11,names_to = "stat",values_to = "count")
+    pivot_longer(cols = 5:13,names_to = "stat",values_to = "count")
 
 stat_selection <- unique(pivot_dat$stat)[c(3,5)]
 names(stat_selection) <- c("hospital admissions","deaths")
@@ -237,7 +244,7 @@ server <- function(input, output) {
     
     plotData2 <- reactive({
       pData <- pivot_dat[pivot_dat$date >= input$date_range[1] & pivot_dat$date <= input$date_range[2],]
-      pData <- pData[pData$stat %in% c("admissionsperk","deathsperk"),]
+      pData <- pData[pData$stat %in% c("admissionsperk","deathsperk","posivitity_rate"),]
       pData
     })
     
@@ -305,7 +312,7 @@ server <- function(input, output) {
       ggplot(plotData2()) +
         geom_line(aes(date,count,color=stat)) +
         scale_x_date(limits = c(min(plotData2()$date),max(plotData2()$date)),expand = c(0,0)) +
-        facet_wrap(. ~ stat,nrow = 1) +
+        facet_wrap(. ~ stat,nrow = 1,scales = "free_y") +
         theme_bw() +
         theme(text=element_text(size=18)) +
         theme(axis.ticks.x = element_blank(),
