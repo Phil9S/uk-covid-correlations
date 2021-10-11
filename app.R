@@ -16,8 +16,8 @@ library(tidyr)
 library(ggpubr)
 
 # vars
-nation_per_million_ratio <- 0.0150037509 # UK
-nation_population_adult <- 52654348 # UK
+nation_per_million_ratio <- 0.01598 # UK
+nation_population_adult <- 62578778 # UK
 source_data <- "https://api.coronavirus.data.gov.uk/v2/data?areaType=overview&metric=cumPeopleVaccinatedFirstDoseByPublishDate&metric=newAdmissions&metric=newCasesByPublishDate&metric=newDeaths28DaysByPublishDate&metric=https://api.coronavirus.data.gov.uk/v2/data?areaType=overview&metric=cumPeopleVaccinatedSecondDoseByPublishDate&format=csv&format=csv"
 source_data2 <- "https://api.coronavirus.data.gov.uk/v2/data?areaType=overview&metric=newTestsByPublishDate&format=csv&format=csv"
 
