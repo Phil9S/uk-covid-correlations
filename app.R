@@ -18,7 +18,7 @@ library(ggpubr)
 # vars
 nation_per_million_ratio <- 0.01598 # UK
 nation_population_adult <- 62578778 # UK
-source_data <- "https://api.coronavirus.data.gov.uk/v2/data?areaType=overview&metric=cumPeopleVaccinatedFirstDoseByPublishDate&metric=newAdmissions&metric=newCasesByPublishDate&metric=newDeaths28DaysByPublishDate&metric=https://api.coronavirus.data.gov.uk/v2/data?areaType=overview&metric=cumPeopleVaccinatedSecondDoseByPublishDate&format=csv&format=csv"
+source_data <- "https://api.coronavirus.data.gov.uk/v2/data?areaType=overview&metric=cumVaccinationFirstDoseUptakeByPublishDatePercentage&metric=newAdmissions&metric=newCasesByPublishDate&metric=newDeaths28DaysByPublishDate&metric=cumVaccinationSecondDoseUptakeByPublishDatePercentage&format=csv"
 source_data2 <- "https://api.coronavirus.data.gov.uk/v2/data?areaType=overview&metric=newTestsByPublishDate&format=csv&format=csv"
 
 # funcs
@@ -78,10 +78,10 @@ cor_window <- function(dat,window,step,group){
 }
 
 pct_plot_data <- function(dat){
-  at_first <- floor(max((dat$cumPeopleVaccinatedFirstDoseByPublishDate/nation_population_adult)*100,na.rm = T))
+  at_first <- floor(max(dat$cumVaccinationFirstDoseUptakeByPublishDatePercentage,na.rm = T))
   remain <- 100 - at_first
   first_mat <- matrix(c(rep(1,times=at_first),rep(0,times=remain)),nrow = 10,ncol = 10)
-  at_second <- floor(max((dat$cumPeopleVaccinatedSecondDoseByPublishDate/nation_population_adult)*100,na.rm = T))
+  at_second <- floor(max(dat$cumVaccinationSecondDoseUptakeByPublishDatePercentage,na.rm = T))
   remain2 <- 100 - at_second
   second_mat <- matrix(c(rep(1,times=at_second),rep(0,times=remain2)),nrow = 10,ncol = 10)
   plot_mat <- first_mat + second_mat
@@ -352,10 +352,10 @@ server <- function(input, output) {
     })
     
     output$first_vacc <- renderPlot({
-      first_vacc <- pivot_dat[pivot_dat$stat == "cumPeopleVaccinatedFirstDoseByPublishDate" & !is.na(pivot_dat$count),]
+      first_vacc <- pivot_dat[pivot_dat$stat == "cumVaccinationFirstDoseUptakeByPublishDatePercentage" & !is.na(pivot_dat$count),]
       first_vacc$group <- rep("actual",times=nrow(first_vacc))
       average_uptake <- mean(tail(first_vacc$count,n = 14) - lag(tail(first_vacc$count,n = 14)),na.rm = T)
-      max_diff <- nation_population_adult - max(first_vacc$count)
+      max_diff <- 100 - max(first_vacc$count)
       days_to_max <- round(max_diff / average_uptake)
       
       extrapv1 <- data.frame()
@@ -366,7 +366,7 @@ server <- function(input, output) {
                                             areaName = "United Kingdom",
                                             areaType = "overview",
                                             date = d,
-                                            stat = "cumPeopleVaccinatedFirstDoseByPublishDate",
+                                            stat = "cumVaccinationFirstDoseUptakeByPublishDatePercentage",
                                             count = c,
                                             group = "predicted"
                                             ))
@@ -374,9 +374,9 @@ server <- function(input, output) {
       
       v1 <- ggplot() +
         geom_line(data = first_vacc,
-                  aes(date,(count/nation_population_adult)*100),color = "black",linetype=1) +
+                  aes(date,count),color = "black",linetype=1) +
         geom_line(data = extrapv1,
-                  aes(date,(count/nation_population_adult)*100),color = "red",linetype=2) +
+                  aes(date,count),color = "red",linetype=2) +
         geom_vline(xintercept = max(extrapv1$date)) +
         geom_text(data = extrapv1,aes(x = max(date) - 25,y = 2,label=paste0("100% on ",max(date)))) +
         xlab(NULL) + 
@@ -387,10 +387,10 @@ server <- function(input, output) {
     })
     
     output$second_vacc <- renderPlot({
-      second_vacc <- pivot_dat[pivot_dat$stat == "cumPeopleVaccinatedSecondDoseByPublishDate" & !is.na(pivot_dat$count),]
+      second_vacc <- pivot_dat[pivot_dat$stat == "cumVaccinationSecondDoseUptakeByPublishDatePercentage" & !is.na(pivot_dat$count),]
       second_vacc$group <- rep("actual",times=nrow(second_vacc))
       average_uptake <- mean(tail(second_vacc$count,n = 14) - lag(tail(second_vacc$count,n = 14)),na.rm = T)
-      max_diff <- nation_population_adult - max(second_vacc$count)
+      max_diff <- 100 - max(second_vacc$count)
       days_to_max <- round(max_diff / average_uptake)
       
       extrapv2 <- data.frame()
@@ -401,7 +401,7 @@ server <- function(input, output) {
                                           areaName = "United Kingdom",
                                           areaType = "overview",
                                           date = d,
-                                          stat = "cumPeopleVaccinatedSecondDoseByPublishDate",
+                                          stat = "cumVaccinationSecondDoseUptakeByPublishDatePercentage",
                                           count = c,
                                           group = "predicted"
         ))
@@ -409,9 +409,9 @@ server <- function(input, output) {
       
       v2 <- ggplot() +
         geom_line(data = second_vacc,
-                  aes(date,(count/nation_population_adult)*100),color = "black",linetype=1) +
+                  aes(date,count),color = "black",linetype=1) +
         geom_line(data=extrapv2,
-                  aes(date,(count/nation_population_adult)*100),color = "red",linetype=2) +
+                  aes(date,count),color = "red",linetype=2) +
         geom_vline(xintercept = max(extrapv2$date)) +
         geom_text(data = extrapv2,aes(x = max(date) - 30,y = 2,label=paste0("100% on ",max(date)))) +
         xlab(NULL) + 
