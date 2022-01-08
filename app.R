@@ -106,9 +106,9 @@ dat <- read.csv(source_data,header = T) %>%
     left_join(y = dat2,by = "date") %>%
     mutate(date = as.Date(date)) %>%
     arrange(date) %>% slice(62:n()) %>% # First days (march 2020) of reporting is highly inconsistent and contains a lot of missing data for admissions and deaths
-    mutate(admissionsperk = newAdmissions / (newCasesByPublishDate/1000)) %>%
-    mutate(deathsperk = newDeaths28DaysByPublishDate / (newCasesByPublishDate / 1000)) %>%
-    mutate(posivitity_rate = newCasesByPublishDate / newTestsByPublishDate * 100)
+    mutate(admissions_per_1k = newAdmissions / (newCasesByPublishDate/1000)) %>%
+    mutate(deaths_per_1k = newDeaths28DaysByPublishDate / (newCasesByPublishDate / 1000)) %>%
+    mutate(positivity_rate = newCasesByPublishDate / newTestsByPublishDate * 100)
     # mutate(newCasesByPublishDate = newCasesByPublishDate * nation_per_million_ratio) %>%
     # mutate(newDeaths28DaysByPublishDate = newDeaths28DaysByPublishDate * nation_per_million_ratio)
 
@@ -128,7 +128,7 @@ names(stat_selection) <- c("hospital admissions","deaths")
 
 # Define UI
 ui <- fluidPage(theme = shinytheme("flatly"),
-    navbarPage(title = "COIVD-19: UK patient correlations", collapsible = TRUE,position = "fixed-top",    
+    navbarPage(title = "COVID-19: UK patient correlations", collapsible = TRUE,position = "fixed-top",    
     # Application title
     tabPanel(title = "Summary", icon = icon("chart-bar"),
     fluidRow(
@@ -250,7 +250,7 @@ server <- function(input, output) {
         pivot_dat <- pivot_dat %>% group_by(stat) %>% mutate(count = rollmean(count,k = 7,fill = c(NA,NA,NA)))
       }
       pData <- pivot_dat[pivot_dat$date >= input$date_range[1] & pivot_dat$date <= input$date_range[2],]
-      pData <- pData[pData$stat %in% c("admissionsperk","deathsperk","posivitity_rate"),]
+      pData <- pData[pData$stat %in% c("admissions_per_1k","deaths_per_1k","positivity_rate"),]
       pData
     })
     
